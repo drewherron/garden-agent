@@ -4,6 +4,30 @@ from langchain.llms import OpenAI
 from langchain.chat_models import ChatOpenAI
 from langchain.agents import load_tools, initialize_agent, AgentType
 
+def note_already_imported(
+    conn: sqlite3.Connection,
+    title: str,
+    created_date: str,
+    note_content: str
+) -> bool:
+    """
+    Checks if this exact note (title, created_date, note_content)
+    is already in the Imports table.
+    Returns True if it's already imported, otherwise False.
+    """
+    pass
+
+def insert_into_imports(
+    conn: sqlite3.Connection,
+    title: str,
+    created_date: str,
+    note_content: str
+) -> None:
+    """
+    Inserts a record into the Imports table to mark this note as processed.
+    """
+    pass
+
 def parse_org_file(org_file_path: str) -> List[dict]:
     """
     Parses the org file and returns a list of dicts with keys:
