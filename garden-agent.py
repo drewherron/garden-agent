@@ -4,73 +4,89 @@ from langchain.llms import OpenAI
 from langchain.chat_models import ChatOpenAI
 from langchain.agents import load_tools, initialize_agent, AgentType
 
+def parse_org_file(org_file_path: str) -> List[Dict[str, str]]:
+    """
+    Parses the org file and returns a list of notes, each with:
+    {
+        "title": str,
+        "created_date": str,
+        "content": str
+    }
+    """
+    pass
+
 def note_already_imported(
     conn: sqlite3.Connection,
     title: str,
     created_date: str,
-    note_content: str
+    content: str
 ) -> bool:
-    """
-    Checks if this exact note (title, created_date, note_content)
-    is already in the Imports table.
-    Returns True if it's already imported, otherwise False.
-    """
+    """Checks if this note is already in the Imports table."""
     pass
 
 def insert_into_imports(
     conn: sqlite3.Connection,
     title: str,
     created_date: str,
-    note_content: str
+    content: str
 ) -> None:
+    """Marks this note as imported."""
+    pass
+
+def get_all_plants(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
+    """Returns a list of all plants."""
+    pass
+
+def get_plantings_for_plant(conn: sqlite3.Connection, plant_id: int) -> List[Dict[str, Any]]:
     """
-    Inserts a record into the Imports table to mark this note as processed.
+    Returns all plantings rows for a given plant_id,
+    possibly filtered by year, season, other?
     """
     pass
 
-def parse_org_file(org_file_path: str) -> List[dict]:
-    """
-    Parses the org file and returns a list of dicts with keys:
-    - title
-    - created_date
-    - note_content
-    """
+def get_seasons_data(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
+    """Returns all rows from Seasons table."""
     pass
 
-def find_best_plant_match(title: str, conn: sqlite3.Connection, llm) -> Optional[int]:
-    """
-    Uses the LLM to find the best matching plant in the database by name/title.
-    Returns the plant_id if found, otherwise None.
-    """
-    pass
-
-def get_plant_logs(plant_id: int, conn: sqlite3.Connection) -> List[dict]:
-    """
-    Retrieves all logs for a given plant, sorted by year (and possibly season).
-    Returns a list of log rows as dictionaries.
-    """
-    pass
-
-def guess_year_and_season(created_date: str, note_content: str, llm) -> (int, str):
-    """
-    Uses the LLM (and/or logic) to guess the season and confirm the year.
-    Returns (year, season).
-    """
-    pass
-
-def create_or_update_log(
-    plant_id: int,
-    note_date: str,
+def call_llm_for_decision(
+    note_title: str,
     note_content: str,
-    year: int,
-    season: str,
+    note_date: str,
+    plants_data: List[Dict[str, Any]],
+    plantings_data: List[Dict[str, Any]],
+    seasons_data: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """
+    Calls the LLM with the note + context data. 
+    Returns a structured dict about what to do. Example:
+    {
+      "plant_id": 2,
+      "action": "update",  # or "create"
+      "planting_id": 7,    # if updating
+      "year": 2025,
+      "season": "Spring",
+      "batch_number": 1,
+      "fields_to_update": {
+        "pests": ["aphids"],
+        "notes_append": "2025-07-16 Saw aphids today"
+      }
+    }
+    or
+    {
+      "error": "Ambiguous: multiple tomato varieties found..."
+    }
+    """
+    pass
+
+def apply_planting_update(
     conn: sqlite3.Connection,
-    llm
+    decision: Dict[str, Any]
 ) -> None:
     """
-    Checks if there's an existing Logs row for this plant/year/season.
-    If it exists, appends to the notes field and updates any relevant columns.
-    If not, creates a new log row.
+    Reads the LLM decision dict, then either updates an existing Plantings row
+    or creates a new one. For example:
+      - If decision["action"] == "update", run an UPDATE statement.
+      - If it == "create", INSERT a new row with the specified columns.
     """
     pass
 
