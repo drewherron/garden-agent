@@ -1,5 +1,5 @@
 import sqlite3
-from typing import List, Optional
+from typing import List, Dict, Any, Optional
 from langchain.llms import OpenAI
 from langchain.chat_models import ChatOpenAI
 from langchain.agents import load_tools, initialize_agent, AgentType
