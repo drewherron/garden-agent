@@ -21,8 +21,21 @@ def note_already_imported(
     created_date: str,
     content: str
 ) -> bool:
-    """Checks if this note is already in the Imports table."""
-    pass
+    """
+    Checks if this exact note (title, created_date, content)
+    is already in the Imports table.
+    Returns True if it's already imported, otherwise False.
+    """
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT COUNT(*) FROM Imports
+        WHERE title = ? AND created_date = ? AND note_content = ?
+        """,
+        (title, created_date, content)
+    )
+    (count,) = cursor.fetchone()
+    return count > 0
 
 def insert_into_imports(
     conn: sqlite3.Connection,
@@ -30,8 +43,18 @@ def insert_into_imports(
     created_date: str,
     content: str
 ) -> None:
-    """Marks this note as imported."""
-    pass
+    """
+    Inserts a record into the Imports table to mark this note as processed.
+    """
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO Imports (title, created_date, note_content)
+        VALUES (?, ?, ?)
+        """,
+        (title, created_date, content)
+    )
+    conn.commit()
 
 def get_all_plants(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
     """
