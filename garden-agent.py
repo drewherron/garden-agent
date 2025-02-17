@@ -3,6 +3,7 @@ from typing import List, Dict, Any, Optional
 from langchain.llms import OpenAI
 from langchain.chat_models import ChatOpenAI
 from langchain.agents import load_tools, initialize_agent, AgentType
+import difflib
 
 def parse_org_file(org_file_path: str) -> List[Dict[str, str]]:
     """
@@ -14,6 +15,33 @@ def parse_org_file(org_file_path: str) -> List[Dict[str, str]]:
     }
     """
     pass
+def fuzzy_match_plants(
+    note_title: str,
+    plants_data: List[Dict[str, Any]],
+    cutoff: float = 0.3
+) -> List[Dict[str, Any]]:
+    """
+    Compare 'note_title' against the 'name' field of each plant in plants_data.
+    Return a sorted list (descending similarity ratio) of all plants whose name
+    is at least 'cutoff' similar to 'note_title'.
+    """
+
+    # Store tuples: (similarity_ratio, plant_dict)
+    scored_plants = []
+
+    for plant in plants_data:
+        plant_name = plant["name"]
+        ratio = difflib.SequenceMatcher(None, note_title.lower(), plant_name.lower()).ratio()
+        if ratio >= cutoff:
+            scored_plants.append((ratio, plant))
+
+    # Sort descending by ratio
+    scored_plants.sort(key=lambda x: x[0], reverse=True)
+
+    # Extract just the plant dicts in sorted order
+    matched_plants = [p[1] for p in scored_plants]
+
+    return matched_plants
 
 def note_already_imported(
     conn: sqlite3.Connection,
@@ -121,10 +149,6 @@ def get_plantings_for_plant(conn: sqlite3.Connection, plant_id: int) -> List[Dic
     """
     pass
 
-def get_seasons_data(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
-    """Returns all rows from Seasons table."""
-    pass
-
 def call_llm_for_decision(
     note_title: str,
     note_content: str,
@@ -179,7 +203,7 @@ def main():
 
     # 2. Parse the org file
     notes = parse_org_file("garden-log.org")
-
+ 
     # Process each note
     for note in notes:
         t = note["title"]
