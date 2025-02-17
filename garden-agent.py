@@ -145,7 +145,67 @@ def apply_planting_update(
     pass
 
 def main():
-    pass
+
+    conn = sqlite3.connect("garden.db")
+
+    llm = None  # TODO
+
+    # 1. Load these tables before the loop
+    plants_data = get_all_plants(conn)
+    seasons_data = get_seasons_data(conn)
+
+    # 2. Parse the org file
+    notes = parse_org_file("garden-log.org")
+
+    # Process each note
+    for note in notes:
+        t = note["title"]
+        d = note["created_date"]
+        c = note["content"]
+
+        # a) Check if already imported
+        if note_already_imported(conn, t, d, c):
+            continue
+
+        # b) Fuzzy-search locally to narrow plant candidates
+        candidate_plants = fuzzy_match_plants(t, plants_data)
+
+        # c) If no candidates returned, we can skip or let the LLM handle it
+        if not candidate_plants:
+            print(f"No local fuzzy match for '{t}'; skipping or handle in LLM...")
+            # pass all plants to LLM anyway? or
+            # continue?
+
+        # d) Now we can fetch plantings for these candidate plants
+        #    or pass them to the LLM.
+        plantings_data = []
+        for cp in candidate_plants:
+            p_id = cp["id"]
+            plantings_data += get_plantings_for_plant(conn, p_id)
+
+        # e) LLM: finalize the decision
+        decision = call_llm_for_decision(
+            note_title=t,
+            note_content=c,
+            note_date=d,
+            plants_data=candidate_plants,
+            plantings_data=plantings_data,
+            seasons_data=seasons_data
+        )
+
+        if "error" in decision:
+            # Skip if ambiguous or unresolvable
+            print(f"Skipping note due to error: {decision['error']}")
+            continue
+
+        # f) Apply the update
+        apply_planting_update(conn, decision)
+
+        # g) Mark imported
+        insert_into_imports(conn, t, d, c)
+
+    conn.commit()
+    conn.close()
 
 if __name__ == "__main__":
     main()
