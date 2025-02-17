@@ -1,9 +1,11 @@
+import re
+import math
+import difflib
 import sqlite3
 from typing import List, Dict, Any, Optional
 from langchain.llms import OpenAI
 from langchain.chat_models import ChatOpenAI
 from langchain.agents import load_tools, initialize_agent, AgentType
-import difflib
 
 def parse_org_file(org_file_path: str) -> List[Dict[str, str]]:
     """
@@ -14,7 +16,75 @@ def parse_org_file(org_file_path: str) -> List[Dict[str, str]]:
         "content": str
     }
     """
-    pass
+    notes = []
+
+    # Regex to detect a heading line: one or more '*' + space + text
+    heading_regex = re.compile(r'^(\*+)\s+(.*)$')
+    created_regex = re.compile(r'^:CREATED:\s*\[(.*)\]\s*$')
+
+    current_title = None
+    current_created = ""
+    collecting_content = False
+    content_lines = []
+
+    with open(org_file_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.rstrip('\n')
+
+            # 1. Check if this line is a heading
+            heading_match = heading_regex.match(line)
+            if heading_match:
+                # If we already have a note in progress, store it before starting a new one
+                if current_title is not None:
+                    # Combine collected content into a single string
+                    current_content = "\n".join(content_lines).strip()
+                    notes.append({
+                        "title": current_title.strip(),
+                        "created_date": current_created.strip(),
+                        "content": current_content
+                    })
+
+                # Start a new note
+                current_title = heading_match.group(2)
+                current_created = ""
+                content_lines = []
+                collecting_content = False
+                continue
+
+            # 2. If we're inside a note (we have a current_title)
+            if current_title is not None:
+                # Check if we hit the start of a PROPERTIES block
+                if line.strip().lower() == ":properties:":
+                    collecting_content = False  # We stop collecting content in favor of properties
+                    continue
+
+                # Check if we hit the end of the PROPERTIES block
+                if line.strip().lower() == ":end:":
+                    collecting_content = True  # Resume collecting content after :END:
+                    continue
+
+                # If we're inside the PROPERTIES block, look for :CREATED:
+                if not collecting_content:
+                    m = created_regex.match(line)
+                    if m:
+                        current_created = m.group(1).strip()
+                    # We ignore other properties for now
+                    continue
+
+                # Otherwise, if collecting_content is True, we add lines to content
+                content_lines.append(line)
+
+        # End of file: if there's a note in progress, store it
+        if current_title is not None:
+            current_content = "\n".join(content_lines).strip()
+            notes.append({
+                "title": current_title.strip(),
+                "created_date": current_created.strip(),
+                "content": current_content
+            })
+
+    return notes
+
 def fuzzy_match_plants(
     note_title: str,
     plants_data: List[Dict[str, Any]],
