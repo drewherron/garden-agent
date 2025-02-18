@@ -212,13 +212,31 @@ def get_seasons_data(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
         })
     return seasons
 
-def get_plantings_for_plant(conn: sqlite3.Connection, plant_id: int) -> List[Dict[str, Any]]:
+def get_plantings_for_plants(
+    conn: sqlite3.Connection,
+    plant_ids: List[int],
+    limit: int = 10
+) -> List[Dict[str, Any]]:
     """
-    Returns up to 10 of the most recent plantings rows for a given plant_id,
-    ordered by descending id (so the newest rows come first).
+    Returns up to 'limit' of the most recent (by descending id) Plantings rows
+    for all plants in the given list of 'plant_ids'.
+
+    Example:
+        if plant_ids=[1,2,3], we do:
+            SELECT ... FROM Plantings
+            WHERE plant_id IN (1,2,3)
+            ORDER BY id DESC
+            LIMIT ?
+
+        and return at most 'limit' rows.
     """
-    cursor = conn.cursor()
-    cursor.execute("""
+    if not plant_ids:
+        return []  # No plants to look up, return empty list
+
+    # Build the dynamic placeholders for the IN clause
+    placeholders = ", ".join(["?"] * len(plant_ids))
+
+    query = f"""
         SELECT
             id,
             plant_id,
@@ -236,12 +254,17 @@ def get_plantings_for_plant(conn: sqlite3.Connection, plant_id: int) -> List[Dic
             source,
             notes
         FROM Plantings
-        WHERE plant_id = ?
+        WHERE plant_id IN ({placeholders})
         ORDER BY id DESC
-        LIMIT 10
-    """, (plant_id,))
+        LIMIT ?
+    """
 
+    params = list(plant_ids) + [limit]
+
+    cursor = conn.cursor()
+    cursor.execute(query, params)
     rows = cursor.fetchall()
+
     results = []
     for row in rows:
         results.append({
@@ -311,11 +334,11 @@ def main():
 
     llm = None  # TODO
 
-    # 1. Load these tables before the loop
+    # Load these tables before the loop
     plants_data = get_all_plants(conn)
     seasons_data = get_seasons_data(conn)
 
-    # 2. Parse the org file
+    # Parse the org file
     notes = parse_org_file("garden-log.org")
 
     # Process each note
@@ -324,27 +347,25 @@ def main():
         d = note["created_date"]
         c = note["content"]
 
-        # a) Check if already imported
+        # Check if already imported
         if note_already_imported(conn, t, d, c):
             continue
 
-        # b) Fuzzy-search locally to narrow plant candidates
+        # Fuzzy-search locally to narrow plant candidates
         candidate_plants = fuzzy_match_plants(t, plants_data)
 
-        # c) If no candidates returned, we can skip or let the LLM handle it
+        # If no candidates returned, we can skip or let the LLM handle it
         if not candidate_plants:
             print(f"No local fuzzy match for '{t}'; skipping or handle in LLM...")
-            # pass all plants to LLM anyway? or
-            # continue?
+            continue
 
-        # d) Now we can fetch plantings for these candidate plants
-        #    or pass them to the LLM.
-        plantings_data = []
-        for cp in candidate_plants:
-            p_id = cp["id"]
-            plantings_data += get_plantings_for_plant(conn, p_id)
+        # Collect all candidate plant IDs:
+        candidate_ids = [cp["id"] for cp in candidate_plants]
 
-        # e) LLM: finalize the decision
+        # Now get the 10 most recent rows among all those plants:
+        plantings_data = get_plantings_for_plants(conn, candidate_ids, limit=10)
+
+        # LLM: finalize the decision
         decision = call_llm_for_decision(
             note_title=t,
             note_content=c,
@@ -359,10 +380,10 @@ def main():
             print(f"Skipping note due to error: {decision['error']}")
             continue
 
-        # f) Apply the update
+        # Apply the update
         apply_planting_update(conn, decision)
 
-        # g) Mark imported
+        # Mark imported
         insert_into_imports(conn, t, d, c)
 
     conn.commit()
