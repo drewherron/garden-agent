@@ -214,10 +214,54 @@ def get_seasons_data(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
 
 def get_plantings_for_plant(conn: sqlite3.Connection, plant_id: int) -> List[Dict[str, Any]]:
     """
-    Returns all plantings rows for a given plant_id,
-    possibly filtered by year, season, other?
+    Returns up to 10 of the most recent plantings rows for a given plant_id,
+    ordered by descending id (so the newest rows come first).
     """
-    pass
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT
+            id,
+            plant_id,
+            year,
+            season,
+            batch_number,
+            seed_start_date,
+            transplant_date,
+            indoor,
+            soil_ph,
+            pests,
+            disease,
+            fertilizer,
+            amendments,
+            source,
+            notes
+        FROM Plantings
+        WHERE plant_id = ?
+        ORDER BY id DESC
+        LIMIT 10
+    """, (plant_id,))
+
+    rows = cursor.fetchall()
+    results = []
+    for row in rows:
+        results.append({
+            "id": row[0],
+            "plant_id": row[1],
+            "year": row[2],
+            "season": row[3],
+            "batch_number": row[4],
+            "seed_start_date": row[5],
+            "transplant_date": row[6],
+            "indoor": bool(row[7]),
+            "soil_ph": row[8],
+            "pests": row[9],
+            "disease": row[10],
+            "fertilizer": row[11],
+            "amendments": row[12],
+            "source": row[13],
+            "notes": row[14]
+        })
+    return results
 
 def call_llm_for_decision(
     note_title: str,
@@ -273,7 +317,7 @@ def main():
 
     # 2. Parse the org file
     notes = parse_org_file("garden-log.org")
- 
+
     # Process each note
     for note in notes:
         t = note["title"]
