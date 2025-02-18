@@ -218,44 +218,41 @@ def get_plantings_for_plants(
     limit: int = 10
 ) -> List[Dict[str, Any]]:
     """
-    Returns up to 'limit' of the most recent (by descending id) Plantings rows
-    for all plants in the given list of 'plant_ids'.
-
-    Example:
-        if plant_ids=[1,2,3], we do:
-            SELECT ... FROM Plantings
-            WHERE plant_id IN (1,2,3)
-            ORDER BY id DESC
-            LIMIT ?
-
-        and return at most 'limit' rows.
+    Returns up to 'limit' of the most recent (by descending P.id) Plantings rows
+    for all plants in the given list of 'plant_ids', along with 'expected_last_frost'
+    and 'actual_last_frost' from Seasons (joined on matching year).
     """
     if not plant_ids:
-        return []  # No plants to look up, return empty list
+        # No IDs => no rows
+        return []
 
-    # Build the dynamic placeholders for the IN clause
+    # Build placeholders for the IN clause: e.g. "?, ?, ?"
     placeholders = ", ".join(["?"] * len(plant_ids))
 
     query = f"""
         SELECT
-            id,
-            plant_id,
-            year,
-            season,
-            batch_number,
-            seed_start_date,
-            transplant_date,
-            indoor,
-            soil_ph,
-            pests,
-            disease,
-            fertilizer,
-            amendments,
-            source,
-            notes
-        FROM Plantings
-        WHERE plant_id IN ({placeholders})
-        ORDER BY id DESC
+            P.id,
+            P.plant_id,
+            P.year,
+            P.season,
+            P.batch_number,
+            P.seed_start_date,
+            P.transplant_date,
+            P.indoor,
+            P.soil_ph,
+            P.pests,
+            P.disease,
+            P.fertilizer,
+            P.amendments,
+            P.source,
+            P.notes,
+            S.expected_last_frost,
+            S.actual_last_frost
+        FROM Plantings AS P
+        LEFT JOIN Seasons AS S
+            ON P.year = S.year
+        WHERE P.plant_id IN ({placeholders})
+        ORDER BY P.id DESC
         LIMIT ?
     """
 
@@ -282,7 +279,9 @@ def get_plantings_for_plants(
             "fertilizer": row[11],
             "amendments": row[12],
             "source": row[13],
-            "notes": row[14]
+            "notes": row[14],
+            "expected_last_frost": row[15],
+            "actual_last_frost": row[16]
         })
     return results
 
