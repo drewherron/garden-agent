@@ -333,9 +333,8 @@ def main():
 
     llm = None  # TODO
 
-    # Load these tables before the loop
+    # Load Plants table before the loop
     plants_data = get_all_plants(conn)
-    seasons_data = get_seasons_data(conn)
 
     # Parse the org file
     notes = parse_org_file("garden-log.org")
@@ -355,7 +354,7 @@ def main():
 
         # If no candidates returned, we can skip or let the LLM handle it
         if not candidate_plants:
-            print(f"No local fuzzy match for '{t}'; skipping or handle in LLM...")
+            print(f"No local fuzzy match for '{t}' - skipping.")
             continue
 
         # Collect all candidate plant IDs:
@@ -371,11 +370,10 @@ def main():
             note_date=d,
             plants_data=candidate_plants,
             plantings_data=plantings_data,
-            seasons_data=seasons_data
         )
 
         if "error" in decision:
-            # Skip if ambiguous or unresolvable
+            # LLM gave us an error
             print(f"Skipping note due to error: {decision['error']}")
             continue
 
