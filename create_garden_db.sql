@@ -12,7 +12,8 @@ CREATE TABLE Plants (
     soil_ph_max DECIMAL,
     spacing_cm DECIMAL,
     germination_days INT,
-    maturity_days INT
+    maturity_days INT,
+    start_weeks_before_lf DECIMAL
 );
 
 -- 2. Plantings
