@@ -189,31 +189,6 @@ def get_all_plants(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
         })
     return plants
 
-def get_seasons_data(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
-    """
-    Returns all rows from the Seasons table as a list of dicts.
-    """
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT
-            id,
-            year,
-            expected_last_frost,
-            actual_last_frost
-        FROM Seasons
-    """)
-
-    rows = cursor.fetchall()
-    seasons = []
-    for row in rows:
-        seasons.append({
-            "id": row[0],
-            "year": row[1],
-            "expected_last_frost": row[2],
-            "actual_last_frost": row[3]
-        })
-    return seasons
-
 def get_plantings_for_plants(
     conn: sqlite3.Connection,
     plant_ids: List[int],
