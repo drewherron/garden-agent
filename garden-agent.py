@@ -170,7 +170,8 @@ def get_all_plants(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
             soil_ph_max,
             spacing_cm,
             germination_days,
-            maturity_days
+            maturity_days,
+            start_weeks_before_lf
         FROM Plants
     """)
 
@@ -185,7 +186,8 @@ def get_all_plants(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
             "soil_ph_max": row[4],
             "spacing_cm": row[5],
             "germination_days": row[6],
-            "maturity_days": row[7]
+            "maturity_days": row[7],
+            "start_weeks_before_lf": row[8]
         })
     return plants
 
