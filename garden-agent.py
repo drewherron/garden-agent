@@ -1,5 +1,7 @@
 import re
+import json
 import math
+import openai
 import difflib
 import sqlite3
 from typing import List, Dict, Any, Optional
@@ -291,29 +293,122 @@ def call_llm_for_decision(
     note_date: str,
     plants_data: List[Dict[str, Any]],
     plantings_data: List[Dict[str, Any]],
-    seasons_data: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
     """
-    Calls the LLM with the note + context data. 
-    Returns a structured dict about what to do. Example:
+    Calls the LLM with the note + context data. Returns a structured dict about what to do.
+    Format:
     {
-      "plant_id": 2,
-      "action": "update",  # or "create"
-      "planting_id": 7,    # if updating
+      "action": "update" or "create",
+      "plant_id": 123,
+      "planting_id": 7,           # if updating
       "year": 2025,
       "season": "Spring",
-      "batch_number": 1,
+      "batch_number": 2,
       "fields_to_update": {
-        "pests": ["aphids"],
-        "notes_append": "2025-07-16 Saw aphids today"
+        "notes_append": "2025-07-16 Saw aphids today",
+        "pests_append": ["aphids"],
+        "disease_append": [],
+        "fertilizer_append": "",
+        "seed_start_date": "2025-02-14",   # or None if not relevant
+        ...
       }
     }
     or
     {
-      "error": "Ambiguous: multiple tomato varieties found..."
+      "error": "Ambiguous. Multiple tomato matches..."
     }
     """
-    pass
+
+    # --- 1) Build prompt context ---
+
+    # Convert the candidate plants and plantings data to JSON strings
+    plants_json = json.dumps(plants_data, indent=2)
+    plantings_json = json.dumps(plantings_data, indent=2)
+
+    # Instruction for how we want the model to respond
+    instruction = f"""
+You are a gardening data assistant. The user has created a note with the following details:
+
+Title: {note_title}
+Created date: {note_date}
+Content: {note_content}
+
+We have the following candidate plants. Each item has fields like "id" and "name":
+{plants_json}
+
+We also have the newest Plantings rows for these plants. Each Plantings row might look like:
+{plantings_json}
+
+Your job:
+1. Determine which plant this note refers to.
+2. Decide if we should update an existing Plantings row or create a new one.
+3. If we update, specify which row (planting_id).
+4. If we create a new row, specify a new planting with (year, season, batch_number, etc.).
+5. Indicate what fields to update/append. For instance:
+   - Append to notes with a date-stamped line (like "2025-07-16 Saw aphids...")
+   - If user mentions pests, append to pests list or set pests if none.
+   - If user mentions fertilizer, append to fertilizer, etc.
+
+If there's any ambiguity (e.g., multiple equally likely plants or no suitable plantings), return a JSON object with an "error" key describing the issue:
+{{
+  "error": "some description"
+}}
+
+Otherwise return valid JSON in this format (with keys from the original rows and NO extra keys!):
+{{
+  "action": "update" or "create",
+  "plant_id": <number>,
+  "planting_id": <number or null if create>,
+  "year": <number>,
+  "season": "<Spring|Summer|Fall|Winter|Unknown>",
+  "batch_number": <number>,
+  "fields_to_update": {{
+      "notes_append": "<string to append>",
+      "pests_append": ["<string>", ...],
+      "disease_append": ["<string>", ...],
+      "fertilizer_append": "<string>",
+      "seed_start_date": "<YYYY-MM-DD or null>",
+      "transplant_date": "<YYYY-MM-DD or null>",
+      ...
+  }}
+}}
+
+DO NOT include markdown formatting or extra text. Only return a single JSON object.
+Make sure it's valid JSON that can be parsed by Python's json.loads.
+"""
+
+    # --- 2) Call OpenAI Chat Completion ---
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            temperature=0.0,
+            messages=[
+                {"role": "system", "content": "You are a helpful gardening assistant."},
+                {"role": "user", "content": instruction}
+            ],
+        )
+
+        llm_output = response["choices"][0]["message"]["content"].strip()
+
+        # --- 3) Attempt to parse JSON ---
+        decision = json.loads(llm_output)
+
+        # We expect either {"error": "..."} or the detailed schema
+        if "error" in decision:
+            # Return error structure directly
+            return {"error": decision["error"]}
+        else:
+            # Return the full decision if it has the required fields
+            if not all(k in decision for k in ["action", "plant_id", "year", "season", "batch_number", "fields_to_update"]):
+                # If it's missing keys, let's treat it as an error
+                return {"error": "LLM response missing required keys."}
+            # Assuming it's valid... maybe check?
+            return decision
+
+    except json.JSONDecodeError:
+        return {"error": "LLM returned invalid JSON."}
+    except Exception as e:
+        return {"error": f"OpenAI API error: {str(e)}"}
 
 def apply_planting_update(
     conn: sqlite3.Connection,
