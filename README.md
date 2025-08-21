@@ -9,6 +9,8 @@ This will be an AI-powered garden assistant where you can:
 - Query your garden data with natural language
 - Get personalized recommendations based on your garden history
 
+I'll use:
+
 - **RAG (Retrieval Augmented Generation)** for gardening knowledge and advice
 - **Vector databases** for semantic plant similarity and knowledge retrieval
 - **Named Entity Recognition** to extract plants, dates, and activities from text
