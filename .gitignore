@@ -160,3 +160,11 @@ cython_debug/
 
 # Secret files and directories
 *SECRET*
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Vector database storage
+data/chromadb/
